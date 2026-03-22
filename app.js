@@ -26,12 +26,7 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
-const secret = process.env.SECRET;
-userSchema.plugin(encrypt, {
-    secret: secret,
-    encryptedFields: ['password'],
-    excludeFromEncryption: ['email'] // Add this line!
-});
+
 
 const User = mongoose.model("User", userSchema);
 
@@ -51,7 +46,7 @@ app.post("/register", async (req, res) => {
     try {
         const newUser = new User({
             email: req.body.username,
-            password: req.body.password
+            password: md5(req.body.password)
         });
 
         // Use 'await' instead of a callback function
@@ -69,7 +64,7 @@ app.post("/register", async (req, res) => {
 
 app.post("/login", async (req, res) => {
     const username = req.body.username;
-    const password = req.body.password;
+    const password = md5(req.body.password);
 
     try {
         const foundUser = await User.findOne({ email: username });
