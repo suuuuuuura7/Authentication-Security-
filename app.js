@@ -5,7 +5,8 @@ import bodyParser from "body-parser";
 import mongoose from "mongoose";
 import encrypt from "mongoose-encryption";
 import md5 from "md5";
-//import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs";
+const saltround = 10;
 
 const app = express();
 const port = 3000;
@@ -43,47 +44,70 @@ app.get("/register", async (req, res) => {
 });
 
 app.post("/register", async (req, res) => {
-    try {
-        const newUser = new User({
-            email: req.body.username,
-            password: md5(req.body.password)
-        });
 
-        // Use 'await' instead of a callback function
-        await newUser.save();
+    bcrypt.hash(req.body.password, saltround, async function (err, hash) {
 
-        // If the save is successful, the code continues here:
-        res.render("secrets.ejs");
+        try {
+            const newUser = new User({
+                email: req.body.username,
+                password: hash
+            });
 
-    } catch (err) {
-        // If there is an error (like a database crash), it jumps here:
-        console.log("Error during registration:", err);
-        res.redirect("/register"); // Redirect back so the user can try again
-    }
+            // Use 'await' instead of a callback function
+            await newUser.save();
+
+            // If the save is successful, the code continues here:
+            res.render("secrets.ejs");
+
+        } catch (err) {
+            // If there is an error (like a database crash), it jumps here:
+            console.log("Error during registration:", err);
+            res.redirect("/register"); // Redirect back so the user can try again
+        }
+
+    });
+
 });
 
 app.post("/login", async (req, res) => {
+
+
+
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
 
     try {
         const foundUser = await User.findOne({ email: username });
+        console.log("this output is to know the founderUser datatype -" + foundUser);
+
 
         if (foundUser) {
-            if (foundUser.password === password) {
-                res.render("secrets.ejs");
-                console.log("succussfully loged in 🎉");
-            } else {
-                console.log("wrong password!!");
-                res.redirect("/login");
-            }
+
+            bcrypt.compare(password, foundUser.password, async function (err, result) {
+
+                if (result === true) {
+                    res.render("secrets.ejs");
+                    console.log("succussfully loged in 🎉");
+                } else {
+                    console.log("wrong password!!");
+                    res.redirect("/login");
+                }
+
+            });
         }
+
 
     } catch (err) {
         console.log("error duging login: ", err);
         res.redirect("/login");
     }
+
+
+
 });
+
+
+
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
