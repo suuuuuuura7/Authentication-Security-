@@ -7,6 +7,7 @@ import session from 'express-session';
 import passport from 'passport';
 import passportLocalMongoose from 'passport-local-mongoose';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as GitHubStrategy } from 'passport-github2';
 import findOrCreate from "mongoose-findorcreate";
 
 const app = express();
@@ -39,8 +40,7 @@ const userSchema = new mongoose.Schema({
     googleId: String
 });
 
-// Plugin handles hashing and salting automatically
-// Keep your current import, but change the plugin line to:
+
 // Ensure you are passing the function, not the whole module object
 userSchema.plugin(passportLocalMongoose.default || passportLocalMongoose);
 userSchema.plugin(findOrCreate.default || findOrCreate);
@@ -66,7 +66,7 @@ passport.use(new GoogleStrategy({
     clientID: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET,
     callbackURL: "http://localhost:3000/auth/google/secret",
-    userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+
 },
     function (accessToken, refreshToken, profile, cb) {
         User.findOrCreate({ googleId: profile.id })
@@ -76,6 +76,22 @@ passport.use(new GoogleStrategy({
 
 ));
 
+passport.use(new GitHubStrategy({
+    clientID: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/github/secret"
+},
+    function (accessToken, refreshToken, profile, cb) {
+        // 1. Find the user in the DB by their unique GitHub ID
+        User.findOrCreate({ githubId: profile.id }, function (err, user) {
+
+            // 2. The 'cb' (callback) function finishes the process
+            // The first argument is for errors, the second is the user object
+            return cb(err, user);
+        });
+    }
+
+));
 // --- ROUTES ---
 
 
@@ -88,13 +104,23 @@ app.get("/auth/google", passport.authenticate('google', { scope: ["profile"] }))
 
 
 
-app.get("/auth/google/secret", // Singluar: 'secret'
+app.get("/auth/google/secret",
     passport.authenticate('google', { failureRedirect: "/login" }),
     function (req, res) {
         // Successful authentication, redirect to the page that shows ALL secrets
-        res.redirect("/secrets"); // Plural: 'secrets'
+        res.redirect("/secrets");
     }
 );
+
+app.get('/auth/github', passport.authenticate('github', { scope: ["user:email"] }));
+
+app.get('/auth/github/secret',
+    passport.authenticate('github', { failureRedirect: "/login" }),
+    function (req, res) {
+        // Successful authentication, redirect secret.
+        res.redirect("/secrets");
+    });
+
 
 app.get("/login", (req, res) => {
     res.render("login.ejs");
