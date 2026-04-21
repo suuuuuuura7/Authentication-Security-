@@ -13,6 +13,8 @@ import findOrCreate from "mongoose-findorcreate";
 const app = express();
 const port = 3000;
 
+app.set('view engine', 'ejs');
+
 // 1. Basic Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
@@ -37,7 +39,8 @@ mongoose.connect("mongodb://127.0.0.1:27017/userDB")
 const userSchema = new mongoose.Schema({
     username: String,
     password: String,
-    googleId: String
+    googleId: String,
+    secret: [String]
 });
 
 
@@ -130,6 +133,77 @@ app.get("/register", (req, res) => {
     res.render("register.ejs");
 });
 
+
+
+// app.get("/secrets", (req, res) => {
+//      User.find({"secret": {$ne: null}}, function(err, foundUsers){
+//     if (err){
+//       console.log(err);
+//     } else {
+//       if (foundUsers) {
+//         res.render("secrets", {usersWithSecrets: foundUsers});
+//       }
+//     }
+//   });
+// });
+
+app.get("/secrets", async (req, res) => {
+    try {
+        const foundUsers = await User.find({ "secret": { $ne: null } });
+        res.render("secrets", { usersWithSecrets: foundUsers });
+    } catch (err) {
+        console.log(err);
+        res.redirect("/");
+    }
+});
+
+app.get("/submit", function (req, res) {
+    if (req.isAuthenticated()) {
+        res.render("submit");
+    } else {
+        res.redirect("/login");
+    }
+});
+
+/*
+app.post("/submit", (req, res) => {
+    const submittedSecret = req.body.secret;
+    console.log(req.user.id);
+    User.findById(req.user.id, function (err, foundUser) {
+        if (err) {
+            console.log(err);
+        } else {
+            if (foundUser) {
+                foundUser.secret = submittedSecret;
+                foundUser.save(function () {
+                    res.redirect("secrets");
+                })
+            }
+        }
+    });
+
+});
+*/
+
+app.post("/submit", async (req, res) => {
+    const submittedSecret = req.body.secret;
+    try {
+        const foundUser = await User.findById(req.user.id);
+        if (foundUser) {
+
+
+            // foundUser.secret = submittedSecret;
+            foundUser.secret.push(submittedSecret);
+            await foundUser.save();
+            res.redirect("/secrets");
+        }
+    } catch (err) {
+        console.log(err);
+    }
+});
+
+
+
 app.get("/logout", (req, res, next) => {
     // Pass a callback function to handle the logout process
     req.logout((err) => {
@@ -139,16 +213,6 @@ app.get("/logout", (req, res, next) => {
         // Only redirect once the session is officially destroyed
         res.redirect("/");
     });
-});
-
-
-app.get("/secrets", (req, res) => {
-    // isAuthenticated() returns true if a session exists
-    if (req.isAuthenticated()) {
-        res.render("secrets.ejs");
-    } else {
-        res.redirect("/login");
-    }
 });
 
 app.post("/register", (req, res) => {
